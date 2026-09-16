@@ -1,26 +1,26 @@
 [
   {
-    "email": "customer.a@example.test",
+    "email": "customer.a@example.com",
     "display_name": "Customer A",
     "role": "customer"
   },
   {
-    "email": "customer.b@example.test",
+    "email": "customer.b@example.com",
     "display_name": "Customer B",
     "role": "customer"
   },
   {
-    "email": "agent.a@example.test",
+    "email": "agent.a@example.com",
     "display_name": "Agent A",
     "role": "agent"
   },
   {
-    "email": "agent.b@example.test",
+    "email": "agent.b@example.com",
     "display_name": "Agent B",
     "role": "agent"
   },
   {
-    "email": "manager@example.test",
+    "email": "manager@example.com",
     "display_name": "Manager/Admin",
     "role": "manager"
   }
