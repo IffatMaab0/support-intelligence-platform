@@ -4,6 +4,8 @@ from api_client import logout
 from views import (
     s00_sign_in,
     c01_my_requests,
+    c02_submit_request,
+    c03_request_detail,
     a01_my_queue,
     m01_operations_overview,
 )
@@ -30,6 +32,9 @@ def require_role(required_role):
 
 def show_customer_navigation():
     require_role("customer")
+    if st.session_state.get("selected_ticket_id"):
+        c03_request_detail.render()
+        return
     st.sidebar.markdown("### Navigation")
 
     page = st.sidebar.radio(
@@ -44,8 +49,7 @@ def show_customer_navigation():
     if page == "My Requests":
         c01_my_requests.render()
     elif page == "Submit a Request":
-        st.title("Submit a Request")
-        st.info("Request submission will be implemented in a later task.")
+        c02_submit_request.render()
     elif page == "Help Centre":
         st.title("Help Centre")
         st.info("Help Centre will be implemented in a later task.")

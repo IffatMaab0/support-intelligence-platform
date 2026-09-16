@@ -40,3 +40,57 @@ def logout(token: str) -> None:
             "Authorization": f"Bearer {token}",
         },
     )
+
+
+def create_ticket(
+    token: str,
+    subject: str,
+    original_message: str,
+) -> dict:
+    response = requests.post(
+        f"{API_URL}/v1/tickets",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "subject": subject,
+            "original_message": original_message,
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def list_tickets(
+    token: str,
+    search: str | None = None,
+    skip: int = 0,
+    limit: int = 10,
+) -> dict:
+    response = requests.get(
+        f"{API_URL}/v1/tickets",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        params={
+            "search": search,
+            "skip": skip,
+            "limit": limit,
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def get_ticket(token: str, ticket_id: int) -> dict:
+    response = requests.get(
+        f"{API_URL}/v1/tickets/{ticket_id}",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()

@@ -8,35 +8,24 @@ from app.models import AuthSession, User
 from app.schemas import CurrentUserResponse, LoginRequest, LoginResponse
 from app.security import hash_session_token
 from app.services.auth import authenticate_user
-
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
-
+bearer_scheme = HTTPBearer()
 
 def get_current_user(
-    authorization: str | None = Header(default=None),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     session: Session = Depends(get_db),
 ) -> User:
-
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
-
-    token = authorization.removeprefix("Bearer ").strip()
-
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
+    token = credentials.credentials
 
     token_hash = hash_session_token(token)
 
-    auth_session = session.query(AuthSession).filter(
-        AuthSession.session_token_hash == token_hash
-    ).first()
+    auth_session = (
+        session.query(AuthSession)
+        .filter(AuthSession.session_token_hash == token_hash)
+        .first()
+    )
 
     if not auth_session:
         raise HTTPException(
@@ -58,9 +47,7 @@ def get_current_user(
             detail="Not authenticated",
         )
 
-    user = session.query(User).filter(
-        User.id == auth_session.user_id
-    ).first()
+    user = session.query(User).filter(User.id == auth_session.user_id).first()
 
     if not user or not user.is_active:
         raise HTTPException(
