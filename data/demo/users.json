@@ -1,0 +1,27 @@
+[
+  {
+    "email": "customer.a@example.test",
+    "display_name": "Customer A",
+    "role": "customer"
+  },
+  {
+    "email": "customer.b@example.test",
+    "display_name": "Customer B",
+    "role": "customer"
+  },
+  {
+    "email": "agent.a@example.test",
+    "display_name": "Agent A",
+    "role": "agent"
+  },
+  {
+    "email": "agent.b@example.test",
+    "display_name": "Agent B",
+    "role": "agent"
+  },
+  {
+    "email": "manager@example.test",
+    "display_name": "Manager/Admin",
+    "role": "manager"
+  }
+]
