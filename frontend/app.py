@@ -8,6 +8,9 @@ from views import (
     c03_request_detail,
     a01_my_queue,
     m01_operations_overview,
+    m02_all_tickets,
+    a02_ticket_workspace,
+    m03_ticket_oversight,
 )
 
 st.set_page_config(
@@ -59,6 +62,10 @@ def show_agent_navigation():
     require_role("agent")
     st.sidebar.markdown("### Navigation")
 
+    if st.session_state.get("selected_ticket_id"):
+        a02_ticket_workspace.render()
+        return
+
     page = st.sidebar.radio(
         "Agent",
         [
@@ -87,6 +94,7 @@ def show_manager_navigation():
         [
             "Operations Overview",
             "All Tickets",
+            "Ticket Oversight",
             "Team",
             "Knowledge Management",
             "System Status",
@@ -97,8 +105,7 @@ def show_manager_navigation():
     if page == "Operations Overview":
         m01_operations_overview.render()
     elif page == "All Tickets":
-        st.title("All Tickets")
-        st.info("Ticket management will be implemented in a later task.")
+        m02_all_tickets.render()
     elif page == "Team":
         st.title("Team")
         st.info("Team management will be implemented in a later task.")
@@ -111,6 +118,8 @@ def show_manager_navigation():
     elif page == "AI Review — Phase 2":
         st.title("AI Review")
         st.warning("Unavailable — planned for Phase 2.")
+    elif page == "Ticket Oversight":
+        m03_ticket_oversight.render()    
 
 
 if "token" not in st.session_state or "user" not in st.session_state:

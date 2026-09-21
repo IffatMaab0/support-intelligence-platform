@@ -37,6 +37,8 @@ class TicketResponse(BaseModel):
     status: str
     priority: str
     channel: str
+    assigned_agent_id: UUID | None
+    version: int
     created_at: datetime
     updated_at: datetime
     last_public_activity_at: datetime    
@@ -47,3 +49,10 @@ class TicketListResponse(BaseModel):
     total: int
     skip: int
     limit: int    
+
+
+class TicketAssignmentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assigned_agent_id: UUID | None = None
+    expected_version: int = Field(ge=1)    

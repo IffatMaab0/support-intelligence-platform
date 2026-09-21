@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models import Ticket, TicketEvent, User
@@ -42,6 +43,97 @@ def create_ticket(
 
     session.add(event)
 
+    session.commit()
+    session.refresh(ticket)
+
+    return ticket
+
+
+def assign_ticket(
+    session: Session,
+    ticket: Ticket,
+    manager: User,
+    assigned_agent_id,
+    expected_version: int,
+) -> Ticket:
+    ticket = (
+        session.query(Ticket)
+        .filter(Ticket.id == ticket.id)
+        .with_for_update()
+        .first()
+    )
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
+    if ticket.version != expected_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ticket has changed. Please refresh and try again.",
+        )
+
+    if ticket.status == "resolved":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Resolved tickets cannot be reassigned.",
+        )
+
+    agent = None
+
+    if assigned_agent_id is not None:
+        agent = (
+            session.query(User)
+            .filter(User.id == assigned_agent_id)
+            .first()
+        )
+
+        if not agent:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assigned agent not found.",
+            )
+
+        if agent.role.value != "agent":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Assigned user must be an agent.",
+            )
+
+        if not agent.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Assigned agent is inactive.",
+            )
+
+    previous_agent_id = ticket.assigned_agent_id
+    ticket.assigned_agent_id = assigned_agent_id
+    ticket.updated_at = datetime.now(timezone.utc)
+    ticket.version += 1
+
+    if previous_agent_id is None and assigned_agent_id is not None:
+        details = f"Ticket assigned to agent {agent.display_name} by manager."
+
+    elif previous_agent_id is not None and assigned_agent_id is not None:
+        details = (
+            f"Ticket reassigned from agent ID {previous_agent_id} "
+            f"to agent {agent.display_name} by manager."
+        )
+
+    else:
+        details = "Ticket unassigned by manager."
+
+    event = TicketEvent(
+        ticket_id=ticket.id,
+        actor_user_id=manager.id,
+        event_type="assignment_changed",
+        details=details,
+        created_at=ticket.updated_at,
+    )
+
+    session.add(event)
     session.commit()
     session.refresh(ticket)
 

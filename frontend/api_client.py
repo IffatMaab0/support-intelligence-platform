@@ -94,3 +94,36 @@ def get_ticket(token: str, ticket_id: int) -> dict:
 
     response.raise_for_status()
     return response.json()
+
+
+def list_agents(token: str) -> list:
+    response = requests.get(
+        f"{API_URL}/v1/meta/agents",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def assign_ticket(
+    token: str,
+    ticket_id: int,
+    assigned_agent_id: str | None,
+    expected_version: int,
+) -> dict:
+    response = requests.patch(
+        f"{API_URL}/v1/tickets/{ticket_id}/assignment",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "assigned_agent_id": assigned_agent_id,
+            "expected_version": expected_version,
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()

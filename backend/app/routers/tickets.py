@@ -10,8 +10,13 @@ from app.routers.auth import (
     require_customer,
     require_manager,
 )
-from app.schemas import TicketCreate, TicketListResponse, TicketResponse
-from app.services.tickets import create_ticket
+from app.schemas import (
+    TicketAssignmentRequest,
+    TicketCreate,
+    TicketListResponse,
+    TicketResponse,
+)
+from app.services.tickets import assign_ticket, create_ticket
 
 router = APIRouter(
     prefix="/v1/tickets",
@@ -28,6 +33,8 @@ def to_ticket_response(ticket: Ticket) -> TicketResponse:
         status=ticket.status,
         priority=ticket.priority,
         channel=ticket.channel,
+        assigned_agent_id=ticket.assigned_agent_id,
+        version=ticket.version,
         created_at=ticket.created_at,
         updated_at=ticket.updated_at,
         last_public_activity_at=ticket.last_public_activity_at,
@@ -49,6 +56,39 @@ def create_customer_ticket(
         customer=customer,
         subject=data.subject,
         original_message=data.original_message,
+    )
+
+    return to_ticket_response(ticket)
+
+
+@router.patch(
+    "/{ticket_id}/assignment",
+    response_model=TicketResponse,
+)
+def assign_ticket_to_agent(
+    ticket_id: int,
+    data: TicketAssignmentRequest,
+    manager: User = Depends(require_manager),
+    session: Session = Depends(get_db),
+):
+    ticket = (
+        session.query(Ticket)
+        .filter(Ticket.id == ticket_id)
+        .first()
+    )
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
+    ticket = assign_ticket(
+        session=session,
+        ticket=ticket,
+        manager=manager,
+        assigned_agent_id=data.assigned_agent_id,
+        expected_version=data.expected_version,
     )
 
     return to_ticket_response(ticket)
