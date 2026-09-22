@@ -7,6 +7,8 @@ from api_client import (
     list_tickets,
     list_agents,
     assign_ticket,
+    update_ticket_status,
+    update_ticket_priority,
 )
 from components import page_header, empty_state
 
@@ -205,6 +207,70 @@ def render():
     else:
         st.caption("No follow-up messages yet.")
 
+
+    st.subheader("Ticket controls")
+
+    status_options = {
+        "Open": "open",
+        "In review": "in_review",
+        "Resolved": "resolved",
+    }
+
+    priority_options = ["low", "normal", "high"]
+
+    current_status_label = next(
+        label
+        for label, value in status_options.items()
+        if value == selected_ticket["status"]
+    )
+
+    selected_status_label = st.selectbox(
+        "Status",
+        options=list(status_options.keys()),
+        index=list(status_options.keys()).index(current_status_label),
+        key=f"manager_status_{selected_ticket['id']}",
+    )
+
+    selected_priority = st.selectbox(
+        "Manual priority",
+        options=priority_options,
+        index=priority_options.index(selected_ticket["priority"]),
+        key=f"manager_priority_{selected_ticket['id']}",
+    )
+
+    if st.button(
+        "Save ticket changes",
+        key=f"manager_save_changes_{selected_ticket['id']}",
+    ):
+        try:
+            updated_ticket = selected_ticket
+
+            if status_options[selected_status_label] != selected_ticket["status"]:
+                updated_ticket = update_ticket_status(
+                    token,
+                    selected_ticket["id"],
+                    status_options[selected_status_label],
+                    selected_ticket["version"],
+                )
+
+            if selected_priority != updated_ticket["priority"]:
+                updated_ticket = update_ticket_priority(
+                    token,
+                    selected_ticket["id"],
+                    selected_priority,
+                    updated_ticket["version"],
+                )
+
+            st.success("Ticket updated successfully.")
+            st.rerun()
+
+        except requests.HTTPError as exc:
+            detail = exc.response.json().get(
+                "detail",
+                "Unable to update ticket.",
+            )
+            st.error(detail)
+
     st.subheader("Reply to customer")
 
     message_key = f"manager_message_{selected_ticket['id']}"
@@ -297,7 +363,7 @@ def render():
                 expected_version=selected_ticket["version"],
             )
 
-            st.session_state["manager_selected_ticket"] = updated_ticket
+            st.session_state["manager_selected_ticket"] = updated_ticket["id"]
 
             st.success(
                 f"{updated_ticket['reference']} assignment updated."

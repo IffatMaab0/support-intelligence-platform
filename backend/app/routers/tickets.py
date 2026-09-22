@@ -16,9 +16,17 @@ from app.schemas import (
     TicketListResponse,
     TicketMessageCreate,
     TicketMessageResponse,
+    TicketPriorityUpdateRequest,
     TicketResponse,
+    TicketStatusUpdateRequest,
 )
-from app.services.tickets import add_ticket_message, assign_ticket, create_ticket
+from app.services.tickets import (
+    add_ticket_message,
+    assign_ticket,
+    create_ticket,
+    update_ticket_priority,
+    update_ticket_status,
+)
 
 router = APIRouter(
     prefix="/v1/tickets",
@@ -90,6 +98,104 @@ def assign_ticket_to_agent(
         ticket=ticket,
         manager=manager,
         assigned_agent_id=data.assigned_agent_id,
+        expected_version=data.expected_version,
+    )
+
+    return to_ticket_response(ticket)
+
+
+@router.patch(
+    "/{ticket_id}/status",
+    response_model=TicketResponse,
+)
+def update_ticket_status_route(
+    ticket_id: int,
+    data: TicketStatusUpdateRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    if user.role.value == "customer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Customers cannot change ticket status.",
+        )
+
+    if user.role.value == "agent":
+        ticket = (
+            session.query(Ticket)
+            .filter(
+                Ticket.id == ticket_id,
+                Ticket.assigned_agent_id == user.id,
+            )
+            .first()
+        )
+    else:
+        ticket = (
+            session.query(Ticket)
+            .filter(Ticket.id == ticket_id)
+            .first()
+        )
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found.",
+        )
+
+    ticket = update_ticket_status(
+        session=session,
+        ticket=ticket,
+        actor=user,
+        new_status=data.status,
+        expected_version=data.expected_version,
+    )
+
+    return to_ticket_response(ticket)
+
+
+@router.patch(
+    "/{ticket_id}/priority",
+    response_model=TicketResponse,
+)
+def update_ticket_priority_route(
+    ticket_id: int,
+    data: TicketPriorityUpdateRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    if user.role.value == "customer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Customers cannot change ticket priority.",
+        )
+
+    if user.role.value == "agent":
+        ticket = (
+            session.query(Ticket)
+            .filter(
+                Ticket.id == ticket_id,
+                Ticket.assigned_agent_id == user.id,
+            )
+            .first()
+        )
+    else:
+        ticket = (
+            session.query(Ticket)
+            .filter(Ticket.id == ticket_id)
+            .first()
+        )
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found.",
+        )
+
+    ticket = update_ticket_priority(
+        session=session,
+        ticket=ticket,
+        actor=user,
+        new_priority=data.priority,
         expected_version=data.expected_version,
     )
 

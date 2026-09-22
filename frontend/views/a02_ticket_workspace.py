@@ -5,6 +5,8 @@ from api_client import (
     create_ticket_message,
     get_ticket,
     list_ticket_messages,
+    update_ticket_status,
+    update_ticket_priority,
 )
 from components import page_header
 
@@ -79,6 +81,64 @@ def render():
             st.divider()
     else:
         st.caption("No follow-up messages yet.")
+
+    st.subheader("Ticket controls")
+
+    status_options = {
+        "Open": "open",
+        "In review": "in_review",
+        "Resolved": "resolved",
+    }
+
+    priority_options = ["low", "normal", "high"]
+
+    current_status_label = next(
+        label
+        for label, value in status_options.items()
+        if value == ticket["status"]
+    )
+
+    selected_status_label = st.selectbox(
+        "Status",
+        options=list(status_options.keys()),
+        index=list(status_options.keys()).index(current_status_label),
+    )
+
+    selected_priority = st.selectbox(
+        "Manual priority",
+        options=priority_options,
+        index=priority_options.index(ticket["priority"]),
+    )
+
+    if st.button("Save ticket changes"):
+        try:
+            updated_ticket = ticket
+
+            if status_options[selected_status_label] != ticket["status"]:
+                updated_ticket = update_ticket_status(
+                    token,
+                    ticket["id"],
+                    status_options[selected_status_label],
+                    ticket["version"],
+                )
+
+            if selected_priority != updated_ticket["priority"]:
+                updated_ticket = update_ticket_priority(
+                    token,
+                    ticket["id"],
+                    selected_priority,
+                    updated_ticket["version"],
+                )
+
+            st.success("Ticket updated successfully.")
+            st.rerun()
+
+        except requests.HTTPError as exc:
+            detail = exc.response.json().get(
+                "detail",
+                "Unable to update ticket.",
+            )
+            st.error(detail)
 
     st.subheader("Reply to customer")
 

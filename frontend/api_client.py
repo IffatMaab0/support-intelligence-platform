@@ -162,3 +162,43 @@ def create_ticket_message(
 
     response.raise_for_status()
     return response.json()
+
+
+def update_ticket_status(
+    token: str,
+    ticket_id: int,
+    status_value: str,
+    expected_version: int,
+) -> dict:
+    response = requests.patch(
+        f"{API_URL}/v1/tickets/{ticket_id}/status",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "status": status_value,
+            "expected_version": expected_version,
+        },
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def update_ticket_priority(
+    token: str,
+    ticket_id: int,
+    priority: str,
+    expected_version: int,
+) -> dict:
+    response = requests.patch(
+        f"{API_URL}/v1/tickets/{ticket_id}/priority",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "priority": priority,
+            "expected_version": expected_version,
+        },
+    )
+    response.raise_for_status()
+    return response.json()

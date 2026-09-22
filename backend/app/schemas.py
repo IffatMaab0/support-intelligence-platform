@@ -70,3 +70,17 @@ class TicketMessageResponse(BaseModel):
     body: str
     created_at: datetime
     author: str    
+
+
+class TicketStatusUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    expected_version: int = Field(ge=1)
+
+
+class TicketPriorityUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    priority: str
+    expected_version: int = Field(ge=1)    

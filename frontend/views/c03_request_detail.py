@@ -94,7 +94,13 @@ def render():
             placeholder="Write a follow-up...",
         )
 
-        submitted = st.form_submit_button("Send follow-up")
+        button_label = (
+            "Reopen and send"
+            if ticket["status"] == "resolved"
+            else "Send follow-up"
+        )
+
+        submitted = st.form_submit_button(button_label)
 
     if submitted:
         body = st.session_state.get(message_key, "")
