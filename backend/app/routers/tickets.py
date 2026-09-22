@@ -3,7 +3,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Ticket, TicketMessage, User
+from app.models import Ticket, TicketEvent, TicketMessage, TicketNote, User
 from app.routers.auth import (
     get_current_user,
     require_agent,
@@ -16,12 +16,15 @@ from app.schemas import (
     TicketListResponse,
     TicketMessageCreate,
     TicketMessageResponse,
+    TicketNoteCreate,
+    TicketNoteResponse,
     TicketPriorityUpdateRequest,
     TicketResponse,
     TicketStatusUpdateRequest,
 )
 from app.services.tickets import (
     add_ticket_message,
+    add_ticket_note,
     assign_ticket,
     create_ticket,
     update_ticket_priority,
@@ -422,3 +425,177 @@ def create_ticket_message(
         author=author_label,
     )
 
+@router.get(
+    "/{ticket_id}/notes",
+    response_model=list[TicketNoteResponse],
+)
+def list_ticket_notes(
+    ticket_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    if user.role.value == "customer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Customers cannot access private notes.",
+        )
+
+    query = session.query(Ticket).filter(Ticket.id == ticket_id)
+
+    if user.role.value == "agent":
+        query = query.filter(Ticket.assigned_agent_id == user.id)
+
+    elif user.role.value == "manager":
+        pass
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    ticket = query.first()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found.",
+        )
+
+    notes = (
+        session.query(TicketNote, User)
+        .join(User, TicketNote.author_user_id == User.id)
+        .filter(TicketNote.ticket_id == ticket.id)
+        .order_by(
+            TicketNote.created_at.asc(),
+            TicketNote.id.asc(),
+        )
+        .all()
+    )
+
+    return [
+        TicketNoteResponse(
+            id=note.id,
+            ticket_id=note.ticket_id,
+            body=note.body,
+            created_at=note.created_at,
+            author=author.display_name,
+        )
+        for note, author in notes
+    ]
+
+
+@router.post(
+    "/{ticket_id}/notes",
+    response_model=TicketNoteResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_ticket_note(
+    ticket_id: int,
+    data: TicketNoteCreate,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    if user.role.value == "customer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Customers cannot create private notes.",
+        )
+
+    query = session.query(Ticket).filter(Ticket.id == ticket_id)
+
+    if user.role.value == "agent":
+        query = query.filter(Ticket.assigned_agent_id == user.id)
+
+    elif user.role.value == "manager":
+        pass
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    ticket = query.first()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found.",
+        )
+
+    from app.services.tickets import add_ticket_note
+
+    note = add_ticket_note(
+        session=session,
+        ticket=ticket,
+        author=user,
+        body=data.body,
+    )
+
+    return TicketNoteResponse(
+        id=note.id,
+        ticket_id=note.ticket_id,
+        body=note.body,
+        created_at=note.created_at,
+        author=user.display_name,
+    )
+
+
+@router.get(
+    "/{ticket_id}/events",
+)
+def list_ticket_events(
+    ticket_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    if user.role.value == "customer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Customers cannot access ticket activity.",
+        )
+
+    query = session.query(Ticket).filter(Ticket.id == ticket_id)
+
+    if user.role.value == "agent":
+        query = query.filter(Ticket.assigned_agent_id == user.id)
+
+    elif user.role.value == "manager":
+        pass
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    ticket = query.first()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found.",
+        )
+
+    events = (
+        session.query(TicketEvent, User)
+        .join(User, TicketEvent.actor_user_id == User.id)
+        .filter(TicketEvent.ticket_id == ticket.id)
+        .order_by(
+            TicketEvent.created_at.asc(),
+            TicketEvent.id.asc(),
+        )
+        .all()
+    )
+
+    return [
+        {
+            "id": event.id,
+            "event_type": event.event_type,
+            "details": event.details,
+            "created_at": event.created_at,
+            "actor": actor.display_name,
+        }
+        for event, actor in events
+    ]

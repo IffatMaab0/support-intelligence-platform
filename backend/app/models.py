@@ -234,3 +234,29 @@ class TicketMessage(Base):
         default=datetime.utcnow,
         nullable=False,
     )
+
+class TicketNote(Base):
+    __tablename__ = "ticket_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    ticket_id: Mapped[int] = mapped_column(
+        ForeignKey("tickets.id"),
+        nullable=False,
+    )
+
+    author_user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+
+    body: Mapped[str] = mapped_column(
+        String(5000),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False,
+    )

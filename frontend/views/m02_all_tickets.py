@@ -3,7 +3,10 @@ import requests
 
 from api_client import (
     create_ticket_message,
+    create_ticket_note,
+    list_ticket_events,
     list_ticket_messages,
+    list_ticket_notes,
     list_tickets,
     list_agents,
     assign_ticket,
@@ -82,8 +85,13 @@ def render():
     # -------------------------
     filtered_tickets = tickets
 
-    if apply_filters or search or status_filter != "All" or priority_filter != "All" or assignment_filter != "All":
-
+    if (
+        apply_filters
+        or search
+        or status_filter != "All"
+        or priority_filter != "All"
+        or assignment_filter != "All"
+    ):
         if search:
             search_text = search.lower()
 
@@ -144,7 +152,10 @@ def render():
 
     for ticket in filtered_tickets:
         assigned_name = (
-            agent_names.get(ticket["assigned_agent_id"], "Unknown agent")
+            agent_names.get(
+                ticket["assigned_agent_id"],
+                "Unknown agent",
+            )
             if ticket["assigned_agent_id"]
             else "Unassigned"
         )
@@ -169,10 +180,10 @@ def render():
         st.divider()
 
     # -------------------------
-    # Assignment section
+    # Selected ticket
     # -------------------------
     selected_ticket_id = st.session_state.get(
-    "manager_selected_ticket"
+        "manager_selected_ticket"
     )
 
     selected_ticket = next(
@@ -196,18 +207,178 @@ def render():
         st.error(f"Could not load conversation: {exc}")
         return
 
-    st.subheader("Conversation")
+    # -------------------------
+    # Ticket tabs
+    # -------------------------
+    tab_public, tab_internal, tab_activity = st.tabs(
+        [
+            "Public Conversation",
+            "Internal Notes",
+            "Activity",
+        ]
+    )
 
-    if messages:
-        for message in messages:
-            st.write(f"**{message['author']}**")
-            st.write(message["body"])
-            st.caption(f"{message['created_at']} UTC")
-            st.divider()
-    else:
-        st.caption("No follow-up messages yet.")
+    # -------------------------
+    # Public Conversation
+    # -------------------------
+    with tab_public:
+        st.subheader("Conversation")
 
+        if messages:
+            for message in messages:
+                st.write(f"**{message['author']}**")
+                st.write(message["body"])
+                st.caption(f"{message['created_at']} UTC")
+                st.divider()
+        else:
+            st.caption("No follow-up messages yet.")
 
+        st.subheader("Reply to customer")
+
+        message_key = f"manager_message_{selected_ticket['id']}"
+
+        with st.form(
+            key=f"manager_message_form_{selected_ticket['id']}",
+            clear_on_submit=True,
+        ):
+            st.text_area(
+                "Write a reply...",
+                key=message_key,
+                placeholder="Write a reply to the customer...",
+            )
+
+            submitted = st.form_submit_button("Send reply")
+
+        if submitted:
+            body = st.session_state.get(message_key, "")
+
+            try:
+                with st.spinner("Sending reply..."):
+                    create_ticket_message(
+                        token=token,
+                        ticket_id=selected_ticket["id"],
+                        body=body,
+                    )
+
+                st.success("Reply saved.")
+                st.rerun()
+
+            except Exception:
+                st.error(
+                    "We couldn't save your reply. "
+                    "Your message was not delivered."
+                )
+
+    # -------------------------
+    # Internal Notes
+    # -------------------------
+    with tab_internal:
+        st.warning(
+            "PRIVATE — Staff only. The customer cannot see these notes."
+        )
+
+        st.subheader("Internal Notes")
+
+        try:
+            notes = list_ticket_notes(
+                token=token,
+                ticket_id=selected_ticket["id"],
+            )
+        except requests.HTTPError as exc:
+            st.error(f"Could not load private notes: {exc}")
+            notes = []
+        except requests.RequestException as exc:
+            st.error(f"Could not load private notes: {exc}")
+            notes = []
+
+        if notes:
+            for note in notes:
+                st.write(f"**{note['author']}**")
+                st.write(note["body"])
+                st.caption(f"{note['created_at']} UTC")
+                st.divider()
+        else:
+            st.caption("No private notes yet.")
+
+        note_key = f"manager_private_note_{selected_ticket['id']}"
+
+        with st.form(
+            key=f"manager_private_note_form_{selected_ticket['id']}",
+            clear_on_submit=True,
+        ):
+            st.text_area(
+                "Add a private note...",
+                key=note_key,
+                placeholder="Only staff can see this note.",
+            )
+
+            note_submitted = st.form_submit_button(
+                "Add private note"
+            )
+
+        if note_submitted:
+            note_body = st.session_state.get(note_key, "")
+
+            try:
+                with st.spinner("Saving private note..."):
+                    create_ticket_note(
+                        token=token,
+                        ticket_id=selected_ticket["id"],
+                        body=note_body,
+                    )
+
+                st.success("Private note added.")
+                st.rerun()
+
+            except requests.HTTPError as exc:
+                try:
+                    detail = exc.response.json().get(
+                        "detail",
+                        "Unable to save private note.",
+                    )
+                except Exception:
+                    detail = "Unable to save private note."
+
+                st.error(detail)
+
+            except requests.RequestException:
+                st.error(
+                    "We couldn't save the private note."
+                )
+
+    # -------------------------
+    # Activity
+    # -------------------------
+    with tab_activity:
+        st.subheader("Activity")
+
+        try:
+            events = list_ticket_events(
+                token=token,
+                ticket_id=selected_ticket["id"],
+            )
+        except requests.HTTPError as exc:
+            st.error(f"Could not load activity: {exc}")
+            events = []
+        except requests.RequestException as exc:
+            st.error(f"Could not load activity: {exc}")
+            events = []
+
+        if events:
+            for event in events:
+                st.write(
+                    f"**{event['event_type']}** — "
+                    f"{event['actor']}"
+                )
+                st.write(event["details"])
+                st.caption(f"{event['created_at']} UTC")
+                st.divider()
+        else:
+            st.caption("No activity yet.")
+
+    # -------------------------
+    # Ticket controls
+    # -------------------------
     st.subheader("Ticket controls")
 
     status_options = {
@@ -227,14 +398,18 @@ def render():
     selected_status_label = st.selectbox(
         "Status",
         options=list(status_options.keys()),
-        index=list(status_options.keys()).index(current_status_label),
+        index=list(status_options.keys()).index(
+            current_status_label
+        ),
         key=f"manager_status_{selected_ticket['id']}",
     )
 
     selected_priority = st.selectbox(
         "Manual priority",
         options=priority_options,
-        index=priority_options.index(selected_ticket["priority"]),
+        index=priority_options.index(
+            selected_ticket["priority"]
+        ),
         key=f"manager_priority_{selected_ticket['id']}",
     )
 
@@ -245,7 +420,10 @@ def render():
         try:
             updated_ticket = selected_ticket
 
-            if status_options[selected_status_label] != selected_ticket["status"]:
+            if (
+                status_options[selected_status_label]
+                != selected_ticket["status"]
+            ):
                 updated_ticket = update_ticket_status(
                     token,
                     selected_ticket["id"],
@@ -271,42 +449,9 @@ def render():
             )
             st.error(detail)
 
-    st.subheader("Reply to customer")
-
-    message_key = f"manager_message_{selected_ticket['id']}"
-
-    with st.form(
-        key=f"manager_message_form_{selected_ticket['id']}",
-        clear_on_submit=True,
-    ):
-        st.text_area(
-            "Write a reply...",
-            key=message_key,
-            placeholder="Write a reply to the customer...",
-        )
-
-        submitted = st.form_submit_button("Send reply")
-
-    if submitted:
-        body = st.session_state.get(message_key, "")
-
-        try:
-            with st.spinner("Sending reply..."):
-                create_ticket_message(
-                    token=token,
-                    ticket_id=selected_ticket["id"],
-                    body=body,
-                )
-
-            st.success("Reply saved.")
-            st.rerun()
-
-        except Exception:
-            st.error(
-                "We couldn't save your reply. "
-                "Your message was not delivered."
-            )
-
+    # -------------------------
+    # Assignment
+    # -------------------------
     st.divider()
 
     st.subheader("Assignment")
@@ -363,7 +508,9 @@ def render():
                 expected_version=selected_ticket["version"],
             )
 
-            st.session_state["manager_selected_ticket"] = updated_ticket["id"]
+            st.session_state["manager_selected_ticket"] = (
+                updated_ticket["id"]
+            )
 
             st.success(
                 f"{updated_ticket['reference']} assignment updated."
@@ -372,11 +519,15 @@ def render():
             st.rerun()
 
         except requests.HTTPError as exc:
-            if exc.response is not None and exc.response.status_code == 409:
+            if (
+                exc.response is not None
+                and exc.response.status_code == 409
+            ):
                 st.error(
                     "This ticket changed after you opened it. "
                     "Refresh the ticket and reconsider the assignment."
                 )
+
                 if st.button("Refresh"):
                     st.rerun()
             else:

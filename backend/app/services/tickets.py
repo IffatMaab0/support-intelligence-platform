@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models import Ticket, TicketEvent, TicketMessage, User
+from app.models import Ticket, TicketEvent, TicketMessage, TicketNote, User
 from sqlalchemy.exc import SQLAlchemyError
 
 def create_ticket(
@@ -457,3 +457,49 @@ def update_ticket_priority(
     session.refresh(ticket)
 
     return ticket
+
+def add_ticket_note(
+    session: Session,
+    ticket: Ticket,
+    author: User,
+    body: str,
+) -> TicketNote:
+    body = body.strip()
+
+    if not body:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Note body cannot be empty.",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    note = TicketNote(
+        ticket_id=ticket.id,
+        author_user_id=author.id,
+        body=body,
+        created_at=now,
+    )
+
+    session.add(note)
+    session.flush()
+
+    event = TicketEvent(
+        ticket_id=ticket.id,
+        actor_user_id=author.id,
+        event_type="note_added",
+        details=f"{author.display_name} added a private note.",
+        created_at=now,
+    )
+
+    session.add(event)
+
+    try:
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+
+    session.refresh(note)
+
+    return note

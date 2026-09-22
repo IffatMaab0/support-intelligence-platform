@@ -202,3 +202,51 @@ def update_ticket_priority(
     )
     response.raise_for_status()
     return response.json()
+
+def list_ticket_notes(
+    token: str,
+    ticket_id: int,
+) -> list:
+    response = requests.get(
+        f"{API_URL}/v1/tickets/{ticket_id}/notes",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def create_ticket_note(
+    token: str,
+    ticket_id: int,
+    body: str,
+) -> dict:
+    response = requests.post(
+        f"{API_URL}/v1/tickets/{ticket_id}/notes",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "body": body,
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def list_ticket_events(
+    token: str,
+    ticket_id: int,
+) -> list:
+    response = requests.get(
+        f"{API_URL}/v1/tickets/{ticket_id}/events",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()

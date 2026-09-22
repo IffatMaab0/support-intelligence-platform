@@ -3,8 +3,11 @@ import requests
 
 from api_client import (
     create_ticket_message,
+    create_ticket_note,
     get_ticket,
+    list_ticket_events,
     list_ticket_messages,
+    list_ticket_notes,
     update_ticket_status,
     update_ticket_priority,
 )
@@ -71,17 +74,177 @@ def render():
 
     st.divider()
 
-    st.subheader("Conversation")
+    tab_public, tab_internal, tab_activity = st.tabs(
+        [
+            "Public Conversation",
+            "Internal Notes",
+            "Activity",
+        ]
+    )
 
-    if messages:
-        for message in messages:
-            st.write(f"**{message['author']}**")
-            st.write(message["body"])
-            st.caption(f"{message['created_at']} UTC")
-            st.divider()
-    else:
-        st.caption("No follow-up messages yet.")
+    # ---------------------------------------------------------
+    # PUBLIC CONVERSATION
+    # ---------------------------------------------------------
+    with tab_public:
+        st.subheader("Conversation")
 
+        if messages:
+            for message in messages:
+                st.write(f"**{message['author']}**")
+                st.write(message["body"])
+                st.caption(f"{message['created_at']} UTC")
+                st.divider()
+        else:
+            st.caption("No follow-up messages yet.")
+
+        st.subheader("Reply to customer")
+
+        message_key = f"staff_message_{ticket_id}"
+
+        with st.form(
+            key=f"staff_message_form_{ticket_id}",
+            clear_on_submit=True,
+        ):
+            st.text_area(
+                "Write a reply...",
+                key=message_key,
+                placeholder="Write a reply to the customer...",
+            )
+
+            submitted = st.form_submit_button("Send reply")
+
+        if submitted:
+            body = st.session_state.get(message_key, "")
+
+            try:
+                with st.spinner("Sending reply..."):
+                    create_ticket_message(
+                        token=token,
+                        ticket_id=ticket_id,
+                        body=body,
+                    )
+
+                st.success("Reply saved.")
+                st.rerun()
+
+            except Exception:
+                st.error(
+                    "We couldn't save your reply. "
+                    "Your message was not delivered."
+                )
+
+    # ---------------------------------------------------------
+    # INTERNAL NOTES
+    # ---------------------------------------------------------
+    with tab_internal:
+        st.warning(
+            "PRIVATE — Staff only. The customer cannot see these notes."
+        )
+
+        st.subheader("Internal Notes")
+
+        try:
+            notes = list_ticket_notes(
+                token=token,
+                ticket_id=ticket_id,
+            )
+        except requests.HTTPError as exc:
+            st.error(f"Could not load private notes: {exc}")
+            notes = []
+        except requests.RequestException as exc:
+            st.error(f"Could not load private notes: {exc}")
+            notes = []
+
+        if notes:
+            for note in notes:
+                st.write(f"**{note['author']}**")
+                st.write(note["body"])
+                st.caption(f"{note['created_at']} UTC")
+                st.divider()
+        else:
+            st.caption("No private notes yet.")
+
+        note_key = f"private_note_{ticket_id}"
+
+        with st.form(
+            key=f"private_note_form_{ticket_id}",
+            clear_on_submit=True,
+        ):
+            st.text_area(
+                "Add a private note...",
+                key=note_key,
+                placeholder="Only staff can see this note.",
+            )
+
+            note_submitted = st.form_submit_button(
+                "Add private note"
+            )
+
+        if note_submitted:
+            note_body = st.session_state.get(note_key, "")
+
+            try:
+                with st.spinner("Saving private note..."):
+                    create_ticket_note(
+                        token=token,
+                        ticket_id=ticket_id,
+                        body=note_body,
+                    )
+
+                st.success("Private note added.")
+                st.rerun()
+
+            except requests.HTTPError as exc:
+                try:
+                    detail = exc.response.json().get(
+                        "detail",
+                        "Unable to save private note.",
+                    )
+                except Exception:
+                    detail = "Unable to save private note."
+
+                st.error(detail)
+
+            except requests.RequestException:
+                st.error(
+                    "We couldn't save the private note."
+                )
+
+    # ---------------------------------------------------------
+    # ACTIVITY
+    # ---------------------------------------------------------
+    with tab_activity:
+        st.subheader("Activity")
+
+        try:
+            events = list_ticket_events(
+                token=token,
+                ticket_id=ticket_id,
+            )
+        except requests.HTTPError as exc:
+            st.error(f"Could not load activity: {exc}")
+            events = []
+        except requests.RequestException as exc:
+            st.error(f"Could not load activity: {exc}")
+            events = []
+
+        if events:
+            for event in events:
+                st.write(
+                    f"**{event['event_type']}** — "
+                    f"{event['actor']}"
+                )
+                st.write(event["details"])
+                st.caption(f"{event['created_at']} UTC")
+                st.divider()
+        else:
+            st.caption("No activity yet.")
+
+    st.divider()
+
+    # ---------------------------------------------------------
+    # TICKET CONTROLS
+    # ---------------------------------------------------------
     st.subheader("Ticket controls")
 
     status_options = {
@@ -101,7 +264,9 @@ def render():
     selected_status_label = st.selectbox(
         "Status",
         options=list(status_options.keys()),
-        index=list(status_options.keys()).index(current_status_label),
+        index=list(status_options.keys()).index(
+            current_status_label
+        ),
     )
 
     selected_priority = st.selectbox(
@@ -114,7 +279,10 @@ def render():
         try:
             updated_ticket = ticket
 
-            if status_options[selected_status_label] != ticket["status"]:
+            if (
+                status_options[selected_status_label]
+                != ticket["status"]
+            ):
                 updated_ticket = update_ticket_status(
                     token,
                     ticket["id"],
@@ -139,39 +307,3 @@ def render():
                 "Unable to update ticket.",
             )
             st.error(detail)
-
-    st.subheader("Reply to customer")
-
-    message_key = f"staff_message_{ticket_id}"
-
-    with st.form(
-        key=f"staff_message_form_{ticket_id}",
-        clear_on_submit=True,
-    ):
-        st.text_area(
-            "Write a reply...",
-            key=message_key,
-            placeholder="Write a reply to the customer...",
-        )
-
-        submitted = st.form_submit_button("Send reply")
-
-    if submitted:
-        body = st.session_state.get(message_key, "")
-
-        try:
-            with st.spinner("Sending reply..."):
-                create_ticket_message(
-                    token=token,
-                    ticket_id=ticket_id,
-                    body=body,
-                )
-
-            st.success("Reply saved.")
-            st.rerun()
-
-        except Exception:
-            st.error(
-                "We couldn't save your reply. "
-                "Your message was not delivered."
-            )

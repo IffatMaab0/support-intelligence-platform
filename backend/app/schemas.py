@@ -71,6 +71,18 @@ class TicketMessageResponse(BaseModel):
     created_at: datetime
     author: str    
 
+class TicketNoteCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body: str = Field(min_length=1, max_length=5000)
+
+
+class TicketNoteResponse(BaseModel):
+    id: int
+    ticket_id: int
+    body: str
+    created_at: datetime
+    author: str
 
 class TicketStatusUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
