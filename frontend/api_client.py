@@ -127,3 +127,38 @@ def assign_ticket(
 
     response.raise_for_status()
     return response.json()
+
+
+
+def list_ticket_messages(
+    token: str,
+    ticket_id: int,
+) -> list:
+    response = requests.get(
+        f"{API_URL}/v1/tickets/{ticket_id}/messages",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def create_ticket_message(
+    token: str,
+    ticket_id: int,
+    body: str,
+) -> dict:
+    response = requests.post(
+        f"{API_URL}/v1/tickets/{ticket_id}/messages",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "body": body,
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()

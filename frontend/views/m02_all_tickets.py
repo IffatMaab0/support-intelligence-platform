@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 
 from api_client import (
+    create_ticket_message,
+    list_ticket_messages,
     list_tickets,
     list_agents,
     assign_ticket,
@@ -182,6 +184,64 @@ def render():
 
     if not selected_ticket:
         return
+
+    try:
+        messages = list_ticket_messages(
+            token=token,
+            ticket_id=selected_ticket["id"],
+        )
+    except requests.RequestException as exc:
+        st.error(f"Could not load conversation: {exc}")
+        return
+
+    st.subheader("Conversation")
+
+    if messages:
+        for message in messages:
+            st.write(f"**{message['author']}**")
+            st.write(message["body"])
+            st.caption(f"{message['created_at']} UTC")
+            st.divider()
+    else:
+        st.caption("No follow-up messages yet.")
+
+    st.subheader("Reply to customer")
+
+    message_key = f"manager_message_{selected_ticket['id']}"
+
+    with st.form(
+        key=f"manager_message_form_{selected_ticket['id']}",
+        clear_on_submit=True,
+    ):
+        st.text_area(
+            "Write a reply...",
+            key=message_key,
+            placeholder="Write a reply to the customer...",
+        )
+
+        submitted = st.form_submit_button("Send reply")
+
+    if submitted:
+        body = st.session_state.get(message_key, "")
+
+        try:
+            with st.spinner("Sending reply..."):
+                create_ticket_message(
+                    token=token,
+                    ticket_id=selected_ticket["id"],
+                    body=body,
+                )
+
+            st.success("Reply saved.")
+            st.rerun()
+
+        except Exception:
+            st.error(
+                "We couldn't save your reply. "
+                "Your message was not delivered."
+            )
+
+    st.divider()
 
     st.subheader("Assignment")
 

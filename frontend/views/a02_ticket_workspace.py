@@ -1,8 +1,12 @@
 import streamlit as st
 import requests
 
-from api_client import get_ticket
-from components import page_header, empty_state
+from api_client import (
+    create_ticket_message,
+    get_ticket,
+    list_ticket_messages,
+)
+from components import page_header
 
 
 def render():
@@ -22,6 +26,11 @@ def render():
             token=token,
             ticket_id=ticket_id,
         )
+        messages = list_ticket_messages(
+            token=token,
+            ticket_id=ticket_id,
+        )
+
     except requests.HTTPError as exc:
         if exc.response is not None and exc.response.status_code == 404:
             st.error("Ticket not found or access denied.")
@@ -62,6 +71,47 @@ def render():
 
     st.subheader("Conversation")
 
-    empty_state(
-        "Public conversation and private notes will be implemented in later tasks."
-    )
+    if messages:
+        for message in messages:
+            st.write(f"**{message['author']}**")
+            st.write(message["body"])
+            st.caption(f"{message['created_at']} UTC")
+            st.divider()
+    else:
+        st.caption("No follow-up messages yet.")
+
+    st.subheader("Reply to customer")
+
+    message_key = f"staff_message_{ticket_id}"
+
+    with st.form(
+        key=f"staff_message_form_{ticket_id}",
+        clear_on_submit=True,
+    ):
+        st.text_area(
+            "Write a reply...",
+            key=message_key,
+            placeholder="Write a reply to the customer...",
+        )
+
+        submitted = st.form_submit_button("Send reply")
+
+    if submitted:
+        body = st.session_state.get(message_key, "")
+
+        try:
+            with st.spinner("Sending reply..."):
+                create_ticket_message(
+                    token=token,
+                    ticket_id=ticket_id,
+                    body=body,
+                )
+
+            st.success("Reply saved.")
+            st.rerun()
+
+        except Exception:
+            st.error(
+                "We couldn't save your reply. "
+                "Your message was not delivered."
+            )
