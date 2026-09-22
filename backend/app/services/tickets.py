@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models import Ticket, TicketEvent, User
-
+from app.models import Ticket, TicketEvent, TicketMessage, User
+from sqlalchemy.exc import SQLAlchemyError
 
 def create_ticket(
     session: Session,
@@ -138,3 +138,49 @@ def assign_ticket(
     session.refresh(ticket)
 
     return ticket
+
+
+def add_ticket_message(
+    session: Session,
+    ticket: Ticket,
+    author: User,
+    body: str,
+) -> TicketMessage:
+    if not body.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Message body cannot be empty.",
+        )
+    now = datetime.now(timezone.utc)
+
+    message = TicketMessage(
+        ticket_id=ticket.id,
+        author_user_id=author.id,
+        body=body,
+        created_at=now,
+    )
+
+    session.add(message)
+
+    ticket.version += 1
+    ticket.last_public_activity_at = now
+
+    event = TicketEvent(
+        ticket_id=ticket.id,
+        actor_user_id=author.id,
+        event_type="message_added",
+        details="Public ticket message added.",
+        created_at=now,
+    )
+
+    session.add(event)
+
+    try:
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+
+    session.refresh(message)
+
+    return message

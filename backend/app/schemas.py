@@ -56,3 +56,17 @@ class TicketAssignmentRequest(BaseModel):
 
     assigned_agent_id: UUID | None = None
     expected_version: int = Field(ge=1)    
+
+
+class TicketMessageCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body: str = Field(min_length=1, max_length=5000)
+
+
+class TicketMessageResponse(BaseModel):
+    id: int
+    ticket_id: int
+    body: str
+    created_at: datetime
+    author: str    

@@ -3,7 +3,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Ticket, User
+from app.models import Ticket, TicketMessage, User
 from app.routers.auth import (
     get_current_user,
     require_agent,
@@ -14,9 +14,11 @@ from app.schemas import (
     TicketAssignmentRequest,
     TicketCreate,
     TicketListResponse,
+    TicketMessageCreate,
+    TicketMessageResponse,
     TicketResponse,
 )
-from app.services.tickets import assign_ticket, create_ticket
+from app.services.tickets import add_ticket_message, assign_ticket, create_ticket
 
 router = APIRouter(
     prefix="/v1/tickets",
@@ -180,3 +182,137 @@ def list_tickets(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get(
+    "/{ticket_id}/messages",
+    response_model=list[TicketMessageResponse],
+)
+def list_ticket_messages(
+    ticket_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    query = (
+        session.query(Ticket)
+        .filter(Ticket.id == ticket_id)
+    )
+
+    if user.role.value == "customer":
+        query = query.filter(Ticket.customer_id == user.id)
+
+    elif user.role.value == "agent":
+        query = query.filter(Ticket.assigned_agent_id == user.id)
+
+    elif user.role.value == "manager":
+        pass
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    ticket = query.first()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
+    messages = (
+        session.query(TicketMessage, User)
+        .join(User, TicketMessage.author_user_id == User.id)
+        .filter(TicketMessage.ticket_id == ticket.id)
+        .order_by(
+            TicketMessage.created_at.asc(),
+            TicketMessage.id.asc(),
+        )
+        .all()
+    )
+
+    result = []
+
+    for message, author in messages:
+        if user.role.value == "customer":
+            author_label = (
+                "Customer"
+                if author.role.value == "customer"
+                else "Support"
+            )
+        else:
+            author_label = author.display_name
+
+        result.append(
+            TicketMessageResponse(
+                id=message.id,
+                ticket_id=message.ticket_id,
+                body=message.body,
+                created_at=message.created_at,
+                author=author_label,
+            )
+        )
+
+    return result
+
+
+@router.post(
+    "/{ticket_id}/messages",
+    response_model=TicketMessageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_ticket_message(
+    ticket_id: int,
+    data: TicketMessageCreate,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    query = (
+        session.query(Ticket)
+        .filter(Ticket.id == ticket_id)
+    )
+
+    if user.role.value == "customer":
+        query = query.filter(Ticket.customer_id == user.id)
+
+    elif user.role.value == "agent":
+        query = query.filter(Ticket.assigned_agent_id == user.id)
+
+    elif user.role.value == "manager":
+        pass
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    ticket = query.first()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
+    message = add_ticket_message(
+        session=session,
+        ticket=ticket,
+        author=user,
+        body=data.body,
+    )
+
+    if user.role.value == "customer":
+        author_label = "Customer"
+    else:
+        author_label = user.display_name
+
+    return TicketMessageResponse(
+        id=message.id,
+        ticket_id=message.ticket_id,
+        body=message.body,
+        created_at=message.created_at,
+        author=author_label,
+    )
+
