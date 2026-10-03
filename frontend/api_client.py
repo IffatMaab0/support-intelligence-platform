@@ -250,3 +250,15 @@ def list_ticket_events(
 
     response.raise_for_status()
     return response.json()
+
+
+def get_dashboard_summary(token: str) -> dict:
+    response = requests.get(
+        f"{API_URL}/v1/dashboard/summary",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()    
