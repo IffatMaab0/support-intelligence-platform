@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -260,3 +260,67 @@ class TicketNote(Base):
         default=datetime.utcnow,
         nullable=False,
     )
+
+
+class KnowledgeDocument(Base):
+    __tablename__ = "knowledge_documents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    policy_key: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    title: Mapped[str] = mapped_column(
+        String(200),
+        nullable=False,
+    )
+
+    topic: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    audience: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    body: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    content_sha256: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="draft",
+    )
+
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    version: Mapped[int] = mapped_column(
+        default=1,
+        nullable=False,
+    )    

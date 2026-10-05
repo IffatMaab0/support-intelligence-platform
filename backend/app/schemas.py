@@ -96,3 +96,42 @@ class TicketPriorityUpdateRequest(BaseModel):
 
     priority: str
     expected_version: int = Field(ge=1)    
+
+
+class KnowledgeDocumentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    policy_key: str = Field(min_length=1, max_length=255)
+    title: str = Field(min_length=1, max_length=200)
+    topic: str = Field(min_length=1, max_length=100)
+    audience: str
+    body: str = Field(min_length=1, max_length=5000)
+
+
+class KnowledgeDocumentResponse(BaseModel):
+    id: int
+    policy_key: str
+    title: str
+    topic: str
+    audience: str
+    body: str
+    content_sha256: str
+    status: str
+    created_by: UUID
+    created_at: datetime
+    updated_at: datetime
+    version: int
+
+
+class KnowledgeDocumentListResponse(BaseModel):
+    items: list[KnowledgeDocumentResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class KnowledgeDocumentStatusUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    expected_version: int = Field(ge=1)   
