@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -11,10 +12,30 @@ from app.schemas import (
 )
 from app.routers.auth import get_current_user, require_manager
 
+
 router = APIRouter(
     prefix="/v1/documents",
     tags=["documents"],
 )
+
+
+def to_document_response(
+    document: KnowledgeDocument,
+) -> KnowledgeDocumentResponse:
+    return KnowledgeDocumentResponse(
+        id=document.id,
+        policy_key=document.policy_key,
+        title=document.title,
+        topic=document.topic,
+        audience=document.audience,
+        body=document.body,
+        content_sha256=document.content_sha256,
+        status=document.status,
+        created_by=document.created_by,
+        created_at=document.created_at,
+        updated_at=document.updated_at,
+        version=document.version,
+    )
 
 
 @router.get("", response_model=KnowledgeDocumentListResponse)
@@ -59,7 +80,10 @@ def list_documents(
     )
 
     return KnowledgeDocumentListResponse(
-        items=documents,
+        items=[
+            to_document_response(document)
+            for document in documents
+        ],
         total=total,
         skip=skip,
         limit=limit,
@@ -78,7 +102,7 @@ def create_document(
 ):
     from app.services.documents import create_document as create_document_service
 
-    return create_document_service(
+    document = create_document_service(
         session=session,
         manager=manager,
         policy_key=payload.policy_key,
@@ -87,6 +111,8 @@ def create_document(
         audience=payload.audience,
         body=payload.body,
     )
+
+    return to_document_response(document)
 
 
 @router.get(
@@ -130,7 +156,7 @@ def get_document(
             detail="Document not found.",
         )
 
-    return document
+    return to_document_response(document)
 
 
 @router.patch(
@@ -157,10 +183,13 @@ def update_document_status(
             detail="Document not found.",
         )
 
-    return update_document_status(
+    document = update_document_status(
         session=session,
         document=document,
         manager=manager,
         new_status=payload.status,
         expected_version=payload.expected_version,
     )
+
+    return to_document_response(document)
+
