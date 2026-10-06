@@ -6,11 +6,14 @@ from views import (
     c01_my_requests,
     c02_submit_request,
     c03_request_detail,
+    c04_help_centre,
     a01_my_queue,
+    a02_ticket_workspace,
+    a03_knowledge_library,
     m01_operations_overview,
     m02_all_tickets,
-    a02_ticket_workspace,
     m03_ticket_oversight,
+    m05_knowledge_management,
 )
 
 st.set_page_config(
@@ -54,8 +57,7 @@ def show_customer_navigation():
     elif page == "Submit a Request":
         c02_submit_request.render()
     elif page == "Help Centre":
-        st.title("Help Centre")
-        st.info("Help Centre will be implemented in a later task.")
+        c04_help_centre.render()
 
 
 def show_agent_navigation():
@@ -78,8 +80,7 @@ def show_agent_navigation():
     if page == "My Queue":
         a01_my_queue.render()
     elif page == "Knowledge Library":
-        st.title("Knowledge Library")
-        st.info("Knowledge Library will be implemented in a later task.")
+        a03_knowledge_library.render()
     elif page == "AI Assistant — Phase 2":
         st.title("AI Assistant")
         st.warning("Unavailable — planned for Phase 2.")
@@ -110,8 +111,7 @@ def show_manager_navigation():
         st.title("Team")
         st.info("Team management will be implemented in a later task.")
     elif page == "Knowledge Management":
-        st.title("Knowledge Management")
-        st.info("Knowledge management will be implemented in a later task.")
+        m05_knowledge_management.render()
     elif page == "System Status":
         st.title("System Status")
         st.info("System status will be implemented in a later task.")

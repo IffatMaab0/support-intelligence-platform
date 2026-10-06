@@ -262,3 +262,77 @@ def get_dashboard_summary(token: str) -> dict:
 
     response.raise_for_status()
     return response.json()    
+
+
+def list_documents(
+    token: str,
+    search: str | None = None,
+    topic: str | None = None,
+    skip: int = 0,
+    limit: int = 10,
+) -> dict:
+    response = requests.get(
+        f"{API_URL}/v1/documents",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        params={
+            "skip": skip,
+            "limit": limit,
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def get_document(token: str, document_id: int) -> dict:
+    response = requests.get(
+        f"{API_URL}/v1/documents/{document_id}",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def create_document(
+    token: str,
+    policy_key: str,
+    title: str,
+    topic: str,
+    audience: str,
+    body: str,
+) -> dict:
+    response = requests.post(
+        f"{API_URL}/v1/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "policy_key": policy_key,
+            "title": title,
+            "topic": topic,
+            "audience": audience,
+            "body": body,
+        },
+    )
+    response.raise_for_status()
+    return response.json()
+
+def update_document_status(
+    token: str,
+    document_id: int,
+    status: str,
+    expected_version: int,
+) -> dict:
+    response = requests.patch(
+        f"{API_URL}/v1/documents/{document_id}/status",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "status": status,
+            "expected_version": expected_version,
+        },
+    )
+    response.raise_for_status()
+    return response.json()    
