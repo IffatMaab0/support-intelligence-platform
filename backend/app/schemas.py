@@ -135,3 +135,26 @@ class KnowledgeDocumentStatusUpdateRequest(BaseModel):
 
     status: str
     expected_version: int = Field(ge=1)   
+
+
+class AgentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str = Field(min_length=1, max_length=255)
+    email: EmailStr
+    initial_password: str = Field(min_length=8, max_length=255)
+
+
+class AgentResponse(BaseModel):
+    id: UUID
+    display_name: str
+    email: EmailStr
+    is_active: bool  
+    version: int  
+
+class AgentUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str = Field(min_length=1, max_length=255)
+    is_active: bool
+    expected_version: int = Field(ge=1)   

@@ -13,6 +13,7 @@ from views import (
     m01_operations_overview,
     m02_all_tickets,
     m03_ticket_oversight,
+    m04_team,
     m05_knowledge_management,
 )
 
@@ -108,8 +109,7 @@ def show_manager_navigation():
     elif page == "All Tickets":
         m02_all_tickets.render()
     elif page == "Team":
-        st.title("Team")
-        st.info("Team management will be implemented in a later task.")
+        m04_team.render()
     elif page == "Knowledge Management":
         m05_knowledge_management.render()
     elif page == "System Status":

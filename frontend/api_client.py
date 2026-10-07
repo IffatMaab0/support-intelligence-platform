@@ -336,3 +336,55 @@ def update_document_status(
     )
     response.raise_for_status()
     return response.json()    
+
+def list_admin_agents(token: str) -> list:
+    response = requests.get(
+        f"{API_URL}/v1/admin/agents",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def create_agent(
+    token: str,
+    display_name: str,
+    email: str,
+    initial_password: str,
+) -> dict:
+    response = requests.post(
+        f"{API_URL}/v1/admin/agents",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "display_name": display_name,
+            "email": email,
+            "initial_password": initial_password,
+        },
+    )
+
+    response.raise_for_status()
+    return response.json()   
+
+def update_agent(
+    token: str,
+    agent_id: str,
+    display_name: str,
+    is_active: bool,
+    expected_version: int,
+) -> dict:
+    response = requests.patch(
+        f"{API_URL}/v1/admin/agents/{agent_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "display_name": display_name,
+            "is_active": is_active,
+            "expected_version": expected_version,
+        },
+    )
+    response.raise_for_status()
+    return response.json() 

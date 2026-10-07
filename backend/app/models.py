@@ -62,6 +62,10 @@ class User(Base):
         default=datetime.utcnow,
         nullable=False,
     )
+    version: Mapped[int] = mapped_column(
+        default=1,
+        nullable=False,
+    )
 
 
 class AuthSession(Base):
