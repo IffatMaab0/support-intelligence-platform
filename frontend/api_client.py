@@ -387,4 +387,12 @@ def update_agent(
         },
     )
     response.raise_for_status()
+    return response.json()
+
+def get_system_status(token: str) -> dict:
+    response = requests.get(
+        f"{API_URL}/v1/system/status",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    response.raise_for_status()
     return response.json() 

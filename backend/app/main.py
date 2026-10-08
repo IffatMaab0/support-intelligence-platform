@@ -8,7 +8,7 @@ from app.routers.meta import router as meta_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.documents import router as documents_router
 from app.routers.agents import router as agents_router
-
+from app.routers.system import router as system_router
 app = FastAPI()
 
 app.include_router(health_router)
@@ -18,3 +18,4 @@ app.include_router(meta_router)
 app.include_router(dashboard_router)
 app.include_router(documents_router)
 app.include_router(agents_router)       
+app.include_router(system_router)

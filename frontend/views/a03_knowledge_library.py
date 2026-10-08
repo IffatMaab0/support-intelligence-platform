@@ -1,4 +1,5 @@
-import streamlit as st
+import requests 
+import streamlit as st   
 
 from api_client import get_document, list_documents
 
@@ -22,8 +23,11 @@ def render_document_list(token: str):
     try:
         response = list_documents(token)
         documents = response["items"]
-    except Exception:
-        st.error("Knowledge documents could not be loaded. Please try again.")
+    except requests.RequestException:
+        st.error(
+            "The application service is currently unavailable. "
+            "Please try again."
+        )
         return
 
     if not documents:
@@ -80,8 +84,11 @@ def render_document_reader(token: str, document_id: int):
 
     try:
         document = get_document(token, document_id)
-    except Exception:
-        st.error("Knowledge documents could not be loaded. Please try again.")
+    except requests.RequestException:
+        st.error(
+            "The application service is currently unavailable. "
+            "Please try again."
+        )
         return
 
     st.title(document["title"])

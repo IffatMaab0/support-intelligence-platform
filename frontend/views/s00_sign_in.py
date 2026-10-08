@@ -1,3 +1,4 @@
+import requests
 import streamlit as st
 
 from api_client import get_current_user, login
@@ -22,5 +23,16 @@ def render():
 
             st.rerun()
 
-        except Exception:
-            st.error("Invalid email or password.")
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 401:
+                st.error("Invalid email or password.")
+            else:
+                st.error(
+                    "The application service is currently unavailable. "
+                    "Please try again."
+                )
+        except requests.RequestException:
+            st.error(
+                "The application service is currently unavailable. "
+                "Please try again."
+            )
