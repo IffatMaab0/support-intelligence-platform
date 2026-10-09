@@ -1,4 +1,5 @@
 import os
+import uuid
 
 import requests
 from dotenv import load_dotenv
@@ -46,11 +47,16 @@ def create_ticket(
     token: str,
     subject: str,
     original_message: str,
+    idempotency_key: str | None = None,
 ) -> dict:
+    if idempotency_key is None:
+        idempotency_key = str(uuid.uuid4())
+
     response = requests.post(
         f"{API_URL}/v1/tickets",
         headers={
             "Authorization": f"Bearer {token}",
+            "Idempotency-Key": idempotency_key,
         },
         json={
             "subject": subject,
@@ -145,15 +151,21 @@ def list_ticket_messages(
     return response.json()
 
 
+
 def create_ticket_message(
     token: str,
     ticket_id: int,
     body: str,
+    idempotency_key: str | None = None,
 ) -> dict:
+    if idempotency_key is None:
+        idempotency_key = str(uuid.uuid4())
+
     response = requests.post(
         f"{API_URL}/v1/tickets/{ticket_id}/messages",
         headers={
             "Authorization": f"Bearer {token}",
+            "Idempotency-Key": idempotency_key,
         },
         json={
             "body": body,
@@ -162,6 +174,8 @@ def create_ticket_message(
 
     response.raise_for_status()
     return response.json()
+
+
 
 
 def update_ticket_status(
@@ -222,11 +236,16 @@ def create_ticket_note(
     token: str,
     ticket_id: int,
     body: str,
+    idempotency_key: str | None = None,
 ) -> dict:
+    if idempotency_key is None:
+        idempotency_key = str(uuid.uuid4())
+
     response = requests.post(
         f"{API_URL}/v1/tickets/{ticket_id}/notes",
         headers={
             "Authorization": f"Bearer {token}",
+            "Idempotency-Key": idempotency_key,
         },
         json={
             "body": body,
@@ -235,6 +254,7 @@ def create_ticket_note(
 
     response.raise_for_status()
     return response.json()
+
 
 
 def list_ticket_events(

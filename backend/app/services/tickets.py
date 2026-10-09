@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.models import Ticket, TicketEvent, TicketMessage, TicketNote, User
 from sqlalchemy.exc import SQLAlchemyError
 
+
+
 def create_ticket(
     session: Session,
     customer: User,
@@ -42,9 +44,6 @@ def create_ticket(
     )
 
     session.add(event)
-
-    session.commit()
-    session.refresh(ticket)
 
     return ticket
 
@@ -229,14 +228,6 @@ def add_ticket_message(
     )
 
     session.add(event)
-
-    try:
-        session.commit()
-    except SQLAlchemyError:
-        session.rollback()
-        raise
-
-    session.refresh(message)
 
     return message
 
@@ -493,13 +484,5 @@ def add_ticket_note(
     )
 
     session.add(event)
-
-    try:
-        session.commit()
-    except SQLAlchemyError:
-        session.rollback()
-        raise
-
-    session.refresh(note)
 
     return note

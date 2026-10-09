@@ -1,3 +1,4 @@
+import uuid
 import streamlit as st
 
 from api_client import (
@@ -84,10 +85,14 @@ def render():
 
     st.subheader("Send a follow-up")
 
+    message_clear_flag = f"{message_key}_clear_after_success"
+
+    if st.session_state.pop(message_clear_flag, False):
+        st.session_state[message_key] = ""
+
     with st.form(
         key=f"customer_message_form_{ticket_id}",
-        clear_on_submit=True,
-        ):
+    ):
         st.text_area(
             "Write a follow-up...",
             key=message_key,
@@ -103,21 +108,41 @@ def render():
         submitted = st.form_submit_button(button_label)
 
     if submitted:
-        body = st.session_state.get(message_key, "")
+        body = st.session_state.get(message_key, "").strip()
 
-        try:
-            with st.spinner("Sending follow-up..."):
-                create_ticket_message(
-                    token=token,
-                    ticket_id=ticket_id,
-                    body=body,
-                )
-
-            st.success("Follow-up saved.")
-            st.rerun()
-
-        except Exception:
-            st.error(
-                "We couldn't save your follow-up. "
-                "Your message was not delivered."
+        if not body:
+            st.warning("Please write a follow-up message.")
+        else:
+            idempotency_state_key = (
+                f"customer_message_idempotency_{ticket_id}"
             )
+            idempotency_body_key = f"{idempotency_state_key}_body"
+
+            if st.session_state.get(idempotency_body_key) != body:
+                st.session_state[idempotency_body_key] = body
+                st.session_state[idempotency_state_key] = str(uuid.uuid4())
+
+            try:
+                with st.spinner("Sending follow-up..."):
+                    create_ticket_message(
+                        token=token,
+                        ticket_id=ticket_id,
+                        body=body,
+                        idempotency_key=st.session_state[
+                            idempotency_state_key
+                        ],
+                    )
+
+                st.success("Follow-up saved.")
+
+                st.session_state[message_clear_flag] = True
+                st.session_state.pop(idempotency_state_key, None)
+                st.session_state.pop(idempotency_body_key, None)
+
+                st.rerun()
+
+            except Exception:
+                st.error(
+                    "We couldn't confirm that your follow-up was saved. "
+                    "Please retry without changing the text."
+                )

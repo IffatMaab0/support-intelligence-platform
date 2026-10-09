@@ -1,3 +1,4 @@
+import uuid
 import streamlit as st
 
 from api_client import create_ticket
@@ -21,6 +22,13 @@ def render():
         placeholder="Describe your issue...",
         height=180,
     )
+    current_payload = (subject.strip(), original_message.strip())
+
+    if st.session_state.get("ticket_submission_payload") != current_payload:
+        st.session_state["ticket_submission_payload"] = current_payload
+        st.session_state["ticket_idempotency_key"] = str(uuid.uuid4())
+        st.session_state["submitted_ticket"] = None
+
 
     if st.button("Submit Request", type="primary"):
         # Preserve what the customer entered.
@@ -47,15 +55,15 @@ def render():
                 token=token,
                 subject=subject.strip(),
                 original_message=original_message.strip(),
+                idempotency_key=st.session_state["ticket_idempotency_key"],
             )
 
             st.session_state["submitted_ticket"] = ticket
 
         except Exception:
             st.error(
-                "We couldn't submit your request. "
-                "Your request has not been confirmed as saved. "
-                "Please try again."
+                "We couldn't confirm whether your request was saved. "
+                "Please retry without changing the subject or message."
             )
             return
 

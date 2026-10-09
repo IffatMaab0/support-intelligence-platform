@@ -1,3 +1,4 @@
+import uuid
 import streamlit as st
 import requests
 
@@ -237,9 +238,13 @@ def render():
 
         message_key = f"manager_message_{selected_ticket['id']}"
 
+        message_clear_flag = f"{message_key}_clear_after_success"
+
+        if st.session_state.pop(message_clear_flag, False):
+            st.session_state[message_key] = ""
+
         with st.form(
             key=f"manager_message_form_{selected_ticket['id']}",
-            clear_on_submit=True,
         ):
             st.text_area(
                 "Write a reply...",
@@ -250,24 +255,44 @@ def render():
             submitted = st.form_submit_button("Send reply")
 
         if submitted:
-            body = st.session_state.get(message_key, "")
+            body = st.session_state.get(message_key, "").strip()
 
-            try:
-                with st.spinner("Sending reply..."):
-                    create_ticket_message(
-                        token=token,
-                        ticket_id=selected_ticket["id"],
-                        body=body,
+            if not body:
+                st.warning("Please write a reply.")
+            else:
+                idempotency_state_key = (
+                    f"manager_message_idempotency_{selected_ticket['id']}"
+                )
+                idempotency_body_key = f"{idempotency_state_key}_body"
+
+                if st.session_state.get(idempotency_body_key) != body:
+                    st.session_state[idempotency_body_key] = body
+                    st.session_state[idempotency_state_key] = str(uuid.uuid4())
+
+                try:
+                    with st.spinner("Sending reply..."):
+                        create_ticket_message(
+                            token=token,
+                            ticket_id=selected_ticket["id"],
+                            body=body,
+                            idempotency_key=st.session_state[
+                                idempotency_state_key
+                            ],
+                        )
+
+                    st.success("Reply saved.")
+                    st.session_state[message_clear_flag] = True
+                    st.session_state.pop(idempotency_state_key, None)
+                    st.session_state.pop(idempotency_body_key, None)
+                    st.rerun()
+
+                except Exception:
+                    st.error(
+                        "We couldn't confirm that your reply was saved. "
+                        "Please retry without changing the text."
                     )
 
-                st.success("Reply saved.")
-                st.rerun()
 
-            except Exception:
-                st.error(
-                    "We couldn't save your reply. "
-                    "Your message was not delivered."
-                )
 
     # -------------------------
     # Internal Notes
@@ -301,10 +326,13 @@ def render():
             st.caption("No private notes yet.")
 
         note_key = f"manager_private_note_{selected_ticket['id']}"
+        note_clear_flag = f"{note_key}_clear_after_success"
+
+        if st.session_state.pop(note_clear_flag, False):
+            st.session_state[note_key] = ""
 
         with st.form(
             key=f"manager_private_note_form_{selected_ticket['id']}",
-            clear_on_submit=True,
         ):
             st.text_area(
                 "Add a private note...",
@@ -317,34 +345,53 @@ def render():
             )
 
         if note_submitted:
-            note_body = st.session_state.get(note_key, "")
+            note_body = st.session_state.get(note_key, "").strip()
 
-            try:
-                with st.spinner("Saving private note..."):
-                    create_ticket_note(
-                        token=token,
-                        ticket_id=selected_ticket["id"],
-                        body=note_body,
-                    )
-
-                st.success("Private note added.")
-                st.rerun()
-
-            except requests.HTTPError as exc:
-                try:
-                    detail = exc.response.json().get(
-                        "detail",
-                        "Unable to save private note.",
-                    )
-                except Exception:
-                    detail = "Unable to save private note."
-
-                st.error(detail)
-
-            except requests.RequestException:
-                st.error(
-                    "We couldn't save the private note."
+            if not note_body:
+                st.warning("Please write a private note.")
+            else:
+                idempotency_state_key = (
+                    f"manager_private_note_idempotency_{selected_ticket['id']}"
                 )
+                idempotency_body_key = f"{idempotency_state_key}_body"
+
+                if st.session_state.get(idempotency_body_key) != note_body:
+                    st.session_state[idempotency_body_key] = note_body
+                    st.session_state[idempotency_state_key] = str(uuid.uuid4())
+
+                try:
+                    with st.spinner("Saving private note..."):
+                        create_ticket_note(
+                            token=token,
+                            ticket_id=selected_ticket["id"],
+                            body=note_body,
+                            idempotency_key=st.session_state[
+                                idempotency_state_key
+                            ],
+                        )
+
+                    st.success("Private note added.")
+                    st.session_state[note_clear_flag] = True
+                    st.session_state.pop(idempotency_state_key, None)
+                    st.session_state.pop(idempotency_body_key, None)
+                    st.rerun()
+
+                except requests.HTTPError as exc:
+                    try:
+                        detail = exc.response.json().get(
+                            "detail",
+                            "Unable to save private note.",
+                        )
+                    except Exception:
+                        detail = "Unable to save private note."
+
+                    st.error(detail)
+
+                except requests.RequestException:
+                    st.error(
+                        "We couldn't confirm that the private note was saved. "
+                        "Please retry without changing the text."
+                    )
 
     # -------------------------
     # Activity

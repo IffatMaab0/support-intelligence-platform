@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,12 @@ from app.schemas import (
     TicketResponse,
     TicketStatusUpdateRequest,
 )
+from app.services.idempotency import (
+    canonical_request_hash,
+    reserve_idempotency_record,
+    find_idempotency_record,
+)
+
 from app.services.tickets import (
     add_ticket_message,
     add_ticket_note,
@@ -63,7 +69,51 @@ def create_customer_ticket(
     data: TicketCreate,
     customer: User = Depends(require_customer),
     session: Session = Depends(get_db),
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
 ):
+    request_hash = canonical_request_hash(
+        {
+            "subject": data.subject,
+            "original_message": data.original_message,
+        }
+    )
+
+    existing_record = find_idempotency_record(
+        session=session,
+        actor_user_id=customer.id,
+        operation="ticket_create",
+        idempotency_key=idempotency_key,
+    )
+
+    # A completed request with the same key can be safely replayed.
+    if existing_record is not None:
+        if existing_record.request_hash != request_hash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Idempotency key was already used with a different request."
+                ),
+            )
+
+        return TicketResponse(**existing_record.response_body)
+
+    idempotency_record, created = reserve_idempotency_record(
+        session=session,
+        actor_user_id=customer.id,
+        operation="ticket_create",
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+
+    if not created:
+        if idempotency_record.request_hash != request_hash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Idempotency key was already used with a different request.",
+            )
+
+        return TicketResponse(**idempotency_record.response_body)
+
     ticket = create_ticket(
         session=session,
         customer=customer,
@@ -71,7 +121,15 @@ def create_customer_ticket(
         original_message=data.original_message,
     )
 
-    return to_ticket_response(ticket)
+    response = to_ticket_response(ticket)
+
+    idempotency_record.response_body = response.model_dump(mode="json")
+    idempotency_record.response_status = status.HTTP_201_CREATED
+
+    session.commit()
+    session.refresh(ticket)
+
+    return response
 
 
 @router.patch(
@@ -376,6 +434,7 @@ def create_ticket_message(
     data: TicketMessageCreate,
     user: User = Depends(get_current_user),
     session: Session = Depends(get_db),
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
 ):
     query = (
         session.query(Ticket)
@@ -405,6 +464,49 @@ def create_ticket_message(
             detail="Ticket not found",
         )
 
+    request_hash = canonical_request_hash(
+        {
+            "ticket_id": ticket_id,
+            "body": data.body,
+        }
+    )
+
+    existing_record = find_idempotency_record(
+        session=session,
+        actor_user_id=user.id,
+        operation="ticket_message_create",
+        idempotency_key=idempotency_key,
+    )
+
+    if existing_record is not None:
+        if existing_record.request_hash != request_hash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Idempotency key was already used with a different request."
+                ),
+            )
+
+        return TicketMessageResponse(**existing_record.response_body)
+
+
+    idempotency_record, created = reserve_idempotency_record(
+        session=session,
+        actor_user_id=user.id,
+        operation="ticket_message_create",
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+
+    if not created:
+        if idempotency_record.request_hash != request_hash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Idempotency key was already used with a different request.",
+            )
+
+        return TicketMessageResponse(**idempotency_record.response_body)
+
     message = add_ticket_message(
         session=session,
         ticket=ticket,
@@ -412,18 +514,28 @@ def create_ticket_message(
         body=data.body,
     )
 
+    session.flush()
+
     if user.role.value == "customer":
         author_label = "Customer"
     else:
         author_label = user.display_name
 
-    return TicketMessageResponse(
+    response = TicketMessageResponse(
         id=message.id,
         ticket_id=message.ticket_id,
         body=message.body,
         created_at=message.created_at,
         author=author_label,
     )
+
+    idempotency_record.response_body = response.model_dump(mode="json")
+    idempotency_record.response_status = status.HTTP_201_CREATED
+
+    session.commit()
+    session.refresh(message)
+
+    return response
 
 @router.get(
     "/{ticket_id}/notes",
@@ -485,6 +597,7 @@ def list_ticket_notes(
     ]
 
 
+
 @router.post(
     "/{ticket_id}/notes",
     response_model=TicketNoteResponse,
@@ -495,16 +608,20 @@ def create_ticket_note(
     data: TicketNoteCreate,
     user: User = Depends(get_current_user),
     session: Session = Depends(get_db),
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
 ):
+    query = (
+        session.query(Ticket)
+        .filter(Ticket.id == ticket_id)
+    )
+
     if user.role.value == "customer":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Customers cannot create private notes.",
         )
 
-    query = session.query(Ticket).filter(Ticket.id == ticket_id)
-
-    if user.role.value == "agent":
+    elif user.role.value == "agent":
         query = query.filter(Ticket.assigned_agent_id == user.id)
 
     elif user.role.value == "manager":
@@ -521,10 +638,51 @@ def create_ticket_note(
     if not ticket:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Ticket not found.",
+            detail="Ticket not found",
         )
 
-    from app.services.tickets import add_ticket_note
+    request_hash = canonical_request_hash(
+        {
+            "ticket_id": ticket_id,
+            "body": data.body,
+        }
+    )
+
+    existing_record = find_idempotency_record(
+        session=session,
+        actor_user_id=user.id,
+        operation="ticket_note_create",
+        idempotency_key=idempotency_key,
+    )
+
+    if existing_record is not None:
+        if existing_record.request_hash != request_hash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Idempotency key was already used with a different request."
+                ),
+            )
+
+        return TicketNoteResponse(**existing_record.response_body)
+
+
+    idempotency_record, created = reserve_idempotency_record(
+        session=session,
+        actor_user_id=user.id,
+        operation="ticket_note_create",
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+
+    if not created:
+        if idempotency_record.request_hash != request_hash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Idempotency key was already used with a different request.",
+            )
+
+        return TicketNoteResponse(**idempotency_record.response_body)
 
     note = add_ticket_note(
         session=session,
@@ -533,7 +691,9 @@ def create_ticket_note(
         body=data.body,
     )
 
-    return TicketNoteResponse(
+    session.flush()
+
+    response = TicketNoteResponse(
         id=note.id,
         ticket_id=note.ticket_id,
         body=note.body,
@@ -541,6 +701,13 @@ def create_ticket_note(
         author=user.display_name,
     )
 
+    idempotency_record.response_body = response.model_dump(mode="json")
+    idempotency_record.response_status = status.HTTP_201_CREATED
+
+    session.commit()
+    session.refresh(note)
+
+    return response
 
 @router.get(
     "/{ticket_id}/events",

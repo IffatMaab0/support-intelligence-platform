@@ -1,5 +1,8 @@
-import streamlit as st
+
+import uuid
+
 import requests
+import streamlit as st
 
 from api_client import (
     create_ticket_message,
@@ -65,7 +68,6 @@ def render():
     st.write(ticket["original_message"])
 
     st.subheader("Ticket metadata")
-
     st.write(f"Created UTC: {ticket['created_at']}")
     st.write(f"Updated UTC: {ticket['updated_at']}")
 
@@ -100,11 +102,13 @@ def render():
         st.subheader("Reply to customer")
 
         message_key = f"staff_message_{ticket_id}"
+        message_clear_flag = f"{message_key}_clear_after_success"
 
-        with st.form(
-            key=f"staff_message_form_{ticket_id}",
-            clear_on_submit=True,
-        ):
+        # Reset the widget before it is created, but only after success.
+        if st.session_state.pop(message_clear_flag, False):
+            st.session_state[message_key] = ""
+
+        with st.form(key=f"staff_message_form_{ticket_id}"):
             st.text_area(
                 "Write a reply...",
                 key=message_key,
@@ -114,24 +118,47 @@ def render():
             submitted = st.form_submit_button("Send reply")
 
         if submitted:
-            body = st.session_state.get(message_key, "")
+            body = st.session_state.get(message_key, "").strip()
 
-            try:
-                with st.spinner("Sending reply..."):
-                    create_ticket_message(
-                        token=token,
-                        ticket_id=ticket_id,
-                        body=body,
+            if not body:
+                st.warning("Please write a reply before sending.")
+            else:
+                idempotency_state_key = (
+                    f"staff_message_idempotency_{ticket_id}"
+                )
+                idempotency_body_key = f"{idempotency_state_key}_body"
+
+                # Reuse the key for the same text after a failed request.
+                if st.session_state.get(idempotency_body_key) != body:
+                    st.session_state[idempotency_body_key] = body
+                    st.session_state[idempotency_state_key] = str(
+                        uuid.uuid4()
                     )
 
-                st.success("Reply saved.")
-                st.rerun()
+                try:
+                    with st.spinner("Sending reply..."):
+                        create_ticket_message(
+                            token=token,
+                            ticket_id=ticket_id,
+                            body=body,
+                            idempotency_key=st.session_state[
+                                idempotency_state_key
+                            ],
+                        )
 
-            except Exception:
-                st.error(
-                    "We couldn't save your reply. "
-                    "Your message was not delivered."
-                )
+                    st.success("Reply saved.")
+
+                    # Clear the key and reset the widget on the next run.
+                    st.session_state[message_clear_flag] = True
+                    st.session_state.pop(idempotency_state_key, None)
+                    st.session_state.pop(idempotency_body_key, None)
+                    st.rerun()
+
+                except Exception:
+                    st.error(
+                        "We couldn't confirm that your reply was saved. "
+                        "Please retry without changing the text."
+                    )
 
     # ---------------------------------------------------------
     # INTERNAL NOTES
@@ -165,50 +192,74 @@ def render():
             st.caption("No private notes yet.")
 
         note_key = f"private_note_{ticket_id}"
+        note_clear_flag = f"{note_key}_clear_after_success"
 
-        with st.form(
-            key=f"private_note_form_{ticket_id}",
-            clear_on_submit=True,
-        ):
+        # Reset the widget before it is created, but only after success.
+        if st.session_state.pop(note_clear_flag, False):
+            st.session_state[note_key] = ""
+
+        with st.form(key=f"private_note_form_{ticket_id}"):
             st.text_area(
                 "Add a private note...",
                 key=note_key,
                 placeholder="Only staff can see this note.",
             )
 
-            note_submitted = st.form_submit_button(
-                "Add private note"
-            )
+            note_submitted = st.form_submit_button("Add private note")
 
         if note_submitted:
-            note_body = st.session_state.get(note_key, "")
+            note_body = st.session_state.get(note_key, "").strip()
 
-            try:
-                with st.spinner("Saving private note..."):
-                    create_ticket_note(
-                        token=token,
-                        ticket_id=ticket_id,
-                        body=note_body,
-                    )
-
-                st.success("Private note added.")
-                st.rerun()
-
-            except requests.HTTPError as exc:
-                try:
-                    detail = exc.response.json().get(
-                        "detail",
-                        "Unable to save private note.",
-                    )
-                except Exception:
-                    detail = "Unable to save private note."
-
-                st.error(detail)
-
-            except requests.RequestException:
-                st.error(
-                    "We couldn't save the private note."
+            if not note_body:
+                st.warning("Please write a note before saving.")
+            else:
+                idempotency_state_key = (
+                    f"private_note_idempotency_{ticket_id}"
                 )
+                idempotency_body_key = f"{idempotency_state_key}_body"
+
+                # Reuse the key for the same text after a failed request.
+                if st.session_state.get(idempotency_body_key) != note_body:
+                    st.session_state[idempotency_body_key] = note_body
+                    st.session_state[idempotency_state_key] = str(
+                        uuid.uuid4()
+                    )
+
+                try:
+                    with st.spinner("Saving private note..."):
+                        create_ticket_note(
+                            token=token,
+                            ticket_id=ticket_id,
+                            body=note_body,
+                            idempotency_key=st.session_state[
+                                idempotency_state_key
+                            ],
+                        )
+
+                    st.success("Private note added.")
+
+                    # Clear the key and reset the widget on the next run.
+                    st.session_state[note_clear_flag] = True
+                    st.session_state.pop(idempotency_state_key, None)
+                    st.session_state.pop(idempotency_body_key, None)
+                    st.rerun()
+
+                except requests.HTTPError as exc:
+                    try:
+                        detail = exc.response.json().get(
+                            "detail",
+                            "Unable to save private note.",
+                        )
+                    except Exception:
+                        detail = "Unable to save private note."
+
+                    st.error(detail)
+
+                except requests.RequestException:
+                    st.error(
+                        "We couldn't confirm that the private note was "
+                        "saved. Please retry without changing the text."
+                    )
 
     # ---------------------------------------------------------
     # ACTIVITY
@@ -264,9 +315,7 @@ def render():
     selected_status_label = st.selectbox(
         "Status",
         options=list(status_options.keys()),
-        index=list(status_options.keys()).index(
-            current_status_label
-        ),
+        index=list(status_options.keys()).index(current_status_label),
     )
 
     selected_priority = st.selectbox(
@@ -279,10 +328,7 @@ def render():
         try:
             updated_ticket = ticket
 
-            if (
-                status_options[selected_status_label]
-                != ticket["status"]
-            ):
+            if status_options[selected_status_label] != ticket["status"]:
                 updated_ticket = update_ticket_status(
                     token,
                     ticket["id"],
