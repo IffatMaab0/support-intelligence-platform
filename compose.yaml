@@ -13,6 +13,32 @@ services:
       timeout: 5s
       retries: 10
 
+  test-db:
+    image: postgres:16-alpine
+    profiles: ["test"]
+    environment:
+      POSTGRES_DB: support_platform_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d support_platform_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  restore-db:
+    image: postgres:16-alpine
+    profiles: ["recovery"]
+    environment:
+      POSTGRES_DB: support_platform_restore_test
+      POSTGRES_USER: restore_user
+      POSTGRES_PASSWORD: restore_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restore_user -d support_platform_restore_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: ./backend
