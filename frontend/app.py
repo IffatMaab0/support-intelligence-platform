@@ -1,17 +1,15 @@
-
 import streamlit as st
 
 from api_client import logout
 from views import (
-    s00_sign_in,
-    c01_my_requests,
-    c02_submit_request,
-    c03_request_detail,
-    c04_help_centre,
     a01_my_queue,
     a02_ticket_workspace,
     a03_knowledge_library,
     a04_ai_assistant,
+    c01_my_requests,
+    c02_submit_request,
+    c03_request_detail,
+    c04_help_centre,
     m01_operations_overview,
     m02_all_tickets,
     m03_ticket_oversight,
@@ -19,6 +17,7 @@ from views import (
     m05_knowledge_management,
     m06_system_status,
     m07_ai_review,
+    s00_sign_in,
 )
 
 st.set_page_config(
@@ -80,7 +79,7 @@ def show_agent_navigation():
     pages = [
         "My Queue",
         "Knowledge Library",
-        "AI Assistant — Phase 2",
+        "AI Assistant \u2014 Phase 2",
     ]
 
     page = st.sidebar.radio(
@@ -97,7 +96,7 @@ def show_agent_navigation():
         a01_my_queue.render()
     elif page == "Knowledge Library":
         a03_knowledge_library.render()
-    elif page == "AI Assistant — Phase 2":
+    elif page == "AI Assistant \u2014 Phase 2":
         a04_ai_assistant.render()
 
 
@@ -105,33 +104,43 @@ def show_manager_navigation():
     require_role("manager")
     st.sidebar.markdown("### Navigation")
 
+    pages = [
+        "Operations Overview",
+        "All Tickets",
+        "Ticket Oversight",
+        "Team",
+        "Knowledge Management",
+        "System Status",
+        "AI Review \u2014 Phase 2",
+    ]
+    default_page = st.session_state.get(
+        "manager_page",
+        "Operations Overview",
+    )
+    if default_page not in pages:
+        default_page = "Operations Overview"
+
     page = st.sidebar.radio(
         "Manager/Admin",
-        [
-            "Operations Overview",
-            "All Tickets",
-            "Ticket Oversight",
-            "Team",
-            "Knowledge Management",
-            "System Status",
-            "AI Review — Phase 2",
-        ],
+        pages,
+        index=pages.index(default_page),
     )
+    st.session_state["manager_page"] = page
 
     if page == "Operations Overview":
         m01_operations_overview.render()
     elif page == "All Tickets":
         m02_all_tickets.render()
+    elif page == "Ticket Oversight":
+        m03_ticket_oversight.render()
     elif page == "Team":
         m04_team.render()
     elif page == "Knowledge Management":
         m05_knowledge_management.render()
     elif page == "System Status":
         m06_system_status.render()
-    elif page == "AI Review — Phase 2":
+    elif page == "AI Review \u2014 Phase 2":
         m07_ai_review.render()
-    elif page == "Ticket Oversight":
-        m03_ticket_oversight.render()
 
 
 if "token" not in st.session_state or "user" not in st.session_state:
@@ -155,14 +164,10 @@ if st.sidebar.button("Logout"):
 
 if user["role"] == "customer":
     show_customer_navigation()
-
 elif user["role"] == "agent":
     show_agent_navigation()
-
 elif user["role"] == "manager":
     show_manager_navigation()
-
 else:
     clear_session()
     st.error("Unknown user role.")
-
