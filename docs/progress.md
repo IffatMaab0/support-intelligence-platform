@@ -166,3 +166,16 @@ Date: 2026-10-14
 - Scanned repository files for common API-key patterns without reading or
   printing local secret values; no matches were found.
 - Docker Compose configuration and Git whitespace checks pass.
+
+## Task 24 — Handover preparation
+
+Date: 2026-10-14
+
+- Rewrote `README.md` with fresh-checkout setup, migrations, demo-user seeding,
+  application URLs, safe automated-test commands, architecture, and Phase 1
+  scope.
+- Added `manual-tests.md` with CK01–CK40. All checks are currently marked
+  `NOT RUN`; no manual-test result has been claimed without demonstration.
+- Added `evidence/phase1-final/` with safe-evidence instructions.
+- Confirmed the AI Assistant and AI Review screens remain disabled Phase 2
+  placeholders.

@@ -1,7 +1,7 @@
 import streamlit as st
 
 from api_client import get_dashboard_summary
-from components import page_header
+from components import format_datetime, page_header
 
 
 def render():
@@ -19,7 +19,7 @@ def render():
         st.rerun()
 
     st.caption(
-        f"Data-as-of UTC: {summary['data_as_of']}"
+        f"Data as of: {format_datetime(summary['data_as_of'])}"
     )
 
     metrics = summary["metrics"]
@@ -84,7 +84,7 @@ def render():
                 "Ticket": event["ticket_reference"],
                 "Event": event["description"],
                 "Actor": event["actor"],
-                "Timestamp UTC": event["timestamp"],
+                "Timestamp": format_datetime(event["timestamp"]),
             }
         )
 

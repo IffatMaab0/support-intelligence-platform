@@ -15,7 +15,7 @@ from api_client import (
     update_ticket_priority,
     update_ticket_status,
 )
-from components import page_header
+from components import format_datetime, page_header
 
 
 def render():
@@ -75,8 +75,8 @@ def render():
     st.write(ticket["original_message"])
 
     st.caption(
-        f"Created: {ticket['created_at']} UTC  |  "
-        f"Updated: {ticket['updated_at']} UTC"
+        f"Created: {format_datetime(ticket['created_at'])}  |  "
+        f"Updated: {format_datetime(ticket['updated_at'])}"
     )
 
     tab_public, tab_internal, tab_activity = st.tabs(
@@ -103,7 +103,7 @@ def render():
             for message in messages:
                 st.write(f"**{message['author']}**")
                 st.write(message["body"])
-                st.caption(f"{message['created_at']} UTC")
+                st.caption(format_datetime(message["created_at"]))
                 st.divider()
         else:
             st.caption("No follow-up messages yet.")
@@ -181,7 +181,7 @@ def render():
             for note in notes:
                 st.write(f"**{note['author']}**")
                 st.write(note["body"])
-                st.caption(f"{note['created_at']} UTC")
+                st.caption(format_datetime(note["created_at"]))
                 st.divider()
         else:
             st.caption("No private notes yet.")
@@ -265,7 +265,7 @@ def render():
             for event in events:
                 st.write(f"**{event['event_type']}** — {event['actor']}")
                 st.write(event["details"])
-                st.caption(f"{event['created_at']} UTC")
+                st.caption(format_datetime(event["created_at"]))
                 st.divider()
         else:
             st.caption("No activity yet.")

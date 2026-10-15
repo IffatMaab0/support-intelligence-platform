@@ -1,7 +1,7 @@
 import streamlit as st
 
 from api_client import list_tickets
-from components import page_header, empty_state
+from components import empty_state, format_datetime, page_header
 
 
 def render():
@@ -99,7 +99,7 @@ def render():
                 st.write(ticket["subject"])
                 st.caption(
                     f"Status: {ticket['status']} · "
-                    f"Updated: {ticket['updated_at']}"
+                    f"Updated: {format_datetime(ticket['updated_at'])}"
                 )
 
             with col3:

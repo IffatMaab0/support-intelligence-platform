@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 from api_client import list_tickets
-from components import page_header, empty_state
+from components import empty_state, format_datetime, page_header
 
 
 def render():
@@ -88,8 +88,8 @@ def render():
             st.write(
                 f"Status: {ticket['status']}  |  "
                 f"Priority: {ticket['priority']}  |  "
-                f"Created: {ticket['created_at']}  |  "
-                f"Updated: {ticket['updated_at']}"
+                f"Created: {format_datetime(ticket['created_at'])}  |  "
+                f"Updated: {format_datetime(ticket['updated_at'])}"
             )
 
             if st.button(
@@ -111,4 +111,4 @@ def render():
         st.button("Previous", disabled=True)
 
     with col2:
-        st.button("Next", disabled=True)           
+        st.button("Next", disabled=True)

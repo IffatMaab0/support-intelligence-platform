@@ -6,7 +6,7 @@ from api_client import (
     get_ticket,
     list_ticket_messages,
 )
-from components import page_header
+from components import format_datetime, page_header
 
 
 def render():
@@ -57,11 +57,11 @@ def render():
         st.write(ticket["status"])
 
     with col2:
-        st.write("**Created (UTC)**")
-        st.write(ticket["created_at"])
+        st.write("**Created**")
+        st.write(format_datetime(ticket["created_at"]))
 
-    st.write("**Last updated (UTC)**")
-    st.write(ticket["updated_at"])
+    st.write("**Last updated**")
+    st.write(format_datetime(ticket["updated_at"]))
 
     st.divider()
 
@@ -78,7 +78,7 @@ def render():
         for message in messages:
             st.write(f"**{message['author']}**")
             st.write(message["body"])
-            st.caption(f"{message['created_at']} UTC")
+            st.caption(format_datetime(message["created_at"]))
             st.divider()
     else:
         st.caption("No follow-up messages yet.")

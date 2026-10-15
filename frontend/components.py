@@ -1,4 +1,27 @@
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
 import streamlit as st
+
+
+DISPLAY_TIME_ZONE = ZoneInfo("Asia/Karachi")
+
+
+def format_datetime(value: str | None) -> str:
+    """Convert an API UTC timestamp into a friendly Pakistan-local display."""
+    if not value:
+        return "Not available"
+
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return value
+
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+    local_time = timestamp.astimezone(DISPLAY_TIME_ZONE)
+    return local_time.strftime("%d %b %Y, %I:%M %p %Z")
 
 
 def page_header(title):
